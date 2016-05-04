@@ -75,7 +75,11 @@ class RequestHandlerTest extends TestCase {
 
 		$this->registerHttpHelper($httpHelperMock);
 
-		$this->s2s = new RequestHandler($this->federatedShareProvider, \OC::$server->getDatabaseConnection());
+		$this->s2s = new RequestHandler(
+			$this->federatedShareProvider,
+			\OC::$server->getDatabaseConnection(),
+			\OC::$server->getShareManager(),
+			\OC::$server->getRequest());
 
 		$this->connection = \OC::$server->getDatabaseConnection();
 	}

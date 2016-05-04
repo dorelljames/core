@@ -25,11 +25,13 @@
 
 namespace OCA\FederatedFileSharing;
 
-use OCA\FederatedFileSharing\DiscoveryManager;
-use OCA\FederatedFileSharing\FederatedShareProvider;
 use OCA\Files_Sharing\Activity;
+use OCP\AppFramework\Http;
+use OCP\Constants;
 use OCP\Files\NotFoundException;
 use OCP\IDBConnection;
+use OCP\IRequest;
+use OCP\Share;
 
 /**
  * Class RequestHandler
@@ -46,6 +48,12 @@ class RequestHandler {
 	/** @var IDBConnection */
 	private $connection;
 
+	/** @var Share\IManager */
+	private $shareManager;
+
+	/** @var IRequest */
+	private $request;
+
 	/** @var string */
 	private $shareTable = 'share';
 
@@ -54,10 +62,18 @@ class RequestHandler {
 	 *
 	 * @param FederatedShareProvider $federatedShareProvider
 	 * @param IDBConnection $connection
+	 * @param Share\IManager $shareManager
+	 * @param IRequest $request
 	 */
-	public function __construct(FederatedShareProvider $federatedShareProvider, IDBConnection $connection) {
+	public function __construct(FederatedShareProvider $federatedShareProvider,
+								IDBConnection $connection,
+								Share\IManager $shareManager,
+								IRequest $request
+	) {
 		$this->federatedShareProvider = $federatedShareProvider;
 		$this->connection = $connection;
+		$this->shareManager = $shareManager;
+		$this->request = $request;
 	}
 
 	/**
@@ -154,6 +170,53 @@ class RequestHandler {
 		}
 
 		return new \OC_OCS_Result(null, 400, 'server can not add remote share, missing parameter');
+	}
+
+	/**
+	 * ask owner to re-share a federated share
+	 *
+	 * @param $params
+	 * @return \OC_OCS_Result
+	 */
+	public function reShare($params) {
+
+		$id = isset($params['id']) ? $params['id'] : null;
+		$token = $this->request->getParam('token', null);
+		$shareWith = $this->request->getParam('shareWith', null);
+		$permission = $this->request->getParam('permission', null);
+
+		if ($id === null ||
+			$token === null ||
+			$shareWith === null ||
+			$permission === null
+		) {
+			return new \OC_OCS_Result(null, Http::STATUS_BAD_REQUEST);
+		}
+
+		try {
+			$share = $this->shareManager->getShareById($id);
+		} catch (Share\Exceptions\ShareNotFound $e) {
+			return new \OC_OCS_Result(null, Http::STATUS_NOT_FOUND);
+		}
+
+		if ($this->validateShare($share, $token)) {
+
+			// check if re-sharing is allowed
+			if ($share->getPermissions() | ~Constants::PERMISSION_SHARE) {
+				$share->setPermissions($share->getPermissions() & $permission);
+				$share->setSharedWith($shareWith);
+				try {
+					$result = $this->federatedShareProvider->create($share);
+				} catch (\Exception $e) {
+					return new \OC_OCS_Result(null, Http::STATUS_INTERNAL_SERVER_ERROR);
+				}
+			} else {
+				return new \OC_OCS_Result(null, Http::STATUS_FORBIDDEN);
+			}
+		}
+
+		return new \OC_OCS_Result();
+
 	}
 
 	/**
@@ -343,6 +406,24 @@ class RequestHandler {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * check if we got the right share
+	 *
+	 * @param Share\IShare $share
+	 * @param string $token
+	 * @return bool
+	 */
+	protected function validateShare(Share\IShare $share, $token) {
+		if (
+			$share->getShareType() === FederatedShareProvider::SHARE_TYPE_REMOTE &&
+			$share->getToken() === $token
+		) {
+			return true;
+		}
+
+		return false;
 	}
 
 }

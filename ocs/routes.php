@@ -100,13 +100,33 @@ API::register(
 // Server-to-Server Sharing
 if (\OC::$server->getAppManager()->isEnabledForUser('files_sharing')) {
 	$federatedSharingApp = new \OCA\FederatedFileSharing\AppInfo\Application('federatedfilesharing');
-	$s2s = new OCA\FederatedFileSharing\RequestHandler($federatedSharingApp->getFederatedShareProvider(), \OC::$server->getDatabaseConnection());
+	$s2s = new OCA\FederatedFileSharing\RequestHandler(
+		$federatedSharingApp->getFederatedShareProvider(),
+		\OC::$server->getDatabaseConnection(),
+		\OC::$server->getShareManager(),
+		\OC::$server->getRequest()
+	);
 	API::register('post',
 		'/cloud/shares',
 		array($s2s, 'createShare'),
 		'files_sharing',
 		API::GUEST_AUTH
 	);
+
+	API::register('post',
+		'/cloud/{id}/reshare',
+		array($s2s, 'reShare'),
+		'files_sharing',
+		API::GUEST_AUTH
+	);
+
+	API::register('put',
+		'/cloud/{id}/update',
+		array($s2s, 'reShare'),
+		'files_sharing',
+		API::GUEST_AUTH
+	);
+
 
 	API::register('post',
 		'/cloud/shares/{id}/accept',
