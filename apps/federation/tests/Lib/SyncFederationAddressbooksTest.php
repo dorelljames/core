@@ -52,6 +52,7 @@ class SyncFederationAddressbooksTest extends \Test\TestCase {
 		$syncService->expects($this->once())->method('syncRemoteAddressBook')
 			->willReturn(1);
 
+		/** @var \OCA\DAV\CardDAV\SyncService $syncService */
 		$s = new SyncFederationAddressBooks($dbHandler, $syncService);
 		$s->syncThemAll(function($url, $ex) {
 			$this->callBacks[] = [$url, $ex];
@@ -79,6 +80,7 @@ class SyncFederationAddressbooksTest extends \Test\TestCase {
 		$syncService->expects($this->once())->method('syncRemoteAddressBook')
 			->willThrowException(new \Exception('something did not work out'));
 
+		/** @var \OCA\DAV\CardDAV\SyncService $syncService */
 		$s = new SyncFederationAddressBooks($dbHandler, $syncService);
 		$s->syncThemAll(function($url, $ex) {
 			$this->callBacks[] = [$url, $ex];
