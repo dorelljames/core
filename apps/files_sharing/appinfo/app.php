@@ -101,6 +101,15 @@ if ($config->getAppValue('core', 'shareapi_enabled', 'yes') === 'yes') {
 				)
 			);
 		}
+		\OCA\Files\App::getNavigationManager()->add(
+			[
+				'id' => 'pendingshares',
+				'appname' => 'files_sharing',
+				'script' => 'list.php',
+				'order' => 25,
+				'name' => $l->t('Pending shares'),
+			]
+		);
 	}
 }
 

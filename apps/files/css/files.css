@@ -79,7 +79,8 @@
 	background-image: url('../img/star.svg');
 }
 .nav-icon-sharingin,
-.nav-icon-sharingout {
+.nav-icon-sharingout,
+.nav-icon-pendingshares {
 	background-image: url('../img/share.svg');
 }
 .nav-icon-sharinglinks {

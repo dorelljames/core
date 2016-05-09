@@ -37,6 +37,7 @@
 		 */
 		_sharedWithUser: false,
 		_linksOnly: false,
+		_pending: false,
 		_clientSideSort: true,
 		_allowSelection: false,
 
@@ -55,6 +56,9 @@
 			}
 			if (options && options.linksOnly) {
 				this._linksOnly = true;
+			}
+			if (options && options.pending) {
+				this._pending = true;
 			}
 			OC.Plugins.attach('OCA.Sharing.FileList', this);
 		},
@@ -123,19 +127,24 @@
 			this._setCurrentDir('/', false);
 
 			var promises = [];
-			var shares = $.ajax({
-				url: OC.linkToOCS('apps/files_sharing/api/v1') + 'shares',
-				/* jshint camelcase: false */
-				data: {
-					format: 'json',
-					shared_with_me: !!this._sharedWithUser
-				},
-				type: 'GET',
-				beforeSend: function(xhr) {
-					xhr.setRequestHeader('OCS-APIREQUEST', 'true');
-				},
-			});
-			promises.push(shares);
+			if (!!!this._pending) {
+				var shares = $.ajax({
+					url: OC.linkToOCS('apps/files_sharing/api/v1') + 'shares',
+					/* jshint camelcase: false */
+					data: {
+						format: 'json',
+						shared_with_me: !!this._sharedWithUser
+					},
+					type: 'GET',
+					beforeSend: function (xhr) {
+						xhr.setRequestHeader('OCS-APIREQUEST', 'true');
+					},
+				});
+				promises.push(shares);
+			} else {
+				//Push empty promise so callback gets called the same way
+				promises.push($.Deferred().resolve());
+			}
 
 			if (!!this._sharedWithUser) {
 				var remoteShares = $.ajax({
@@ -155,12 +164,29 @@
 				promises.push($.Deferred().resolve());
 			}
 
+			if (!!this._pending) {
+				var pendingShares = $.ajax({
+					url: OC.linkToOCS('apps/files_sharing/api/v1') + 'shares/pending',
+					data: {
+						format: 'json'
+					},
+					type: 'GET',
+					beforeSend: function (xhr) {
+						xhr.setRequestHeader('OCS-APIREQUEST', 'true');
+					},
+				});
+				promises.push(pendingShares);
+			} else {
+				//Push empty promise so callback gets called the same way
+				promises.push($.Deferred().resolve());
+			}
+
 			this._reloadCall = $.when.apply($, promises);
 			var callBack = this.reloadCallback.bind(this);
 			return this._reloadCall.then(callBack, callBack);
 		},
 
-		reloadCallback: function(shares, remoteShares) {
+		reloadCallback: function(shares, remoteShares, pendingShares) {
 			delete this._reloadCall;
 			this.hideMask();
 
@@ -170,12 +196,16 @@
 
 			var files = [];
 
-			if (shares[0].ocs && shares[0].ocs.data) {
+			if (shares && shares[0].ocs && shares[0].ocs.data) {
 				files = files.concat(this._makeFilesFromShares(shares[0].ocs.data));
 			}
 
 			if (remoteShares && remoteShares[0].ocs && remoteShares[0].ocs.data) {
 				files = files.concat(this._makeFilesFromRemoteShares(remoteShares[0].ocs.data));
+			}
+
+			if (pendingShares && pendingShares[0].ocs && pendingShares[0].ocs.data) {
+				files = files.concat(this._makeFilesFromPendingShares(pendingShares[0].ocs.data));
 			}
 
 			this.setFiles(files);
@@ -210,6 +240,33 @@
 			return files;
 		},
 
+		_makeFilesFromPendingShares: function(data) {
+			var files = data;
+
+			files = _.chain(files)
+				// convert share data to file data
+				.map(function(share) {
+					var file = {
+						name: share.name,
+						mimetype: share.mimetype,
+						type: share.type,
+						shareOwner: share.initiator,
+						mtime: share.mtime * 1000,
+						permissions: OC.PERMISSION_READ
+					};
+
+					file.shares = [{
+						id: share.id,
+						type: share.type
+					}];
+
+					return file;
+				})
+				.value();
+
+			return files;
+		},
+
 		/**
 		 * Converts the OCS API share response data to a file info
 		 * list
@@ -240,8 +297,7 @@
 					if (share.item_type === 'folder') {
 						file.type = 'dir';
 						file.mimetype = 'httpd/unix-directory';
-					}
-					else {
+					} else {
 						file.type = 'file';
 					}
 					file.share = {
@@ -258,8 +314,7 @@
 						if (file.path) {
 							file.extraData = share.file_target;
 						}
-					}
-					else {
+					} else {
 						if (share.share_type !== OC.Share.SHARE_TYPE_LINK) {
 							file.share.targetDisplayName = share.share_with_displayname;
 						}

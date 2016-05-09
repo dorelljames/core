@@ -21,6 +21,7 @@ OCA.Sharing.App = {
 
 	_inFileList: null,
 	_outFileList: null,
+	_pendingFileList: null,
 
 	initSharingIn: function($el) {
 		if (this._inFileList) {
@@ -80,7 +81,7 @@ OCA.Sharing.App = {
 				scrollContainer: $('#app-content'),
 				linksOnly: true,
 				fileActions: this._createFileActions(),
-				config: OCA.Files.App.getFilesConfig()
+				config: OCA.Files.App.getFilesConfig(),
 			}
 		);
 
@@ -90,6 +91,44 @@ OCA.Sharing.App = {
 			'<h2>' + t('files_sharing', 'No shared links') + '</h2>' +
 			'<p>' + t('files_sharing', 'Files and folders you share by link will show up here') + '</p>');
 		return this._linkFileList;
+	},
+
+	initPendingShares: function($el) {
+		if (this._pendingFileList) {
+			return this._pendingFileList;
+		}
+
+		var fileActions = new OCA.Files.FileActions();
+		fileActions.registerAction({
+			name: 'accept',
+			displayName: t('files_sharing', 'Accept Share'),
+			type: OCA.Files.FileActions.TYPE_INLINE,
+			mime: 'all',
+			permissions: OC.PERMISSION_READ,
+			actionHandler: function(filename, context) {
+				alert(context.$file.data('share-id'));
+			}
+		});
+
+
+		this._pendingFileList = new OCA.Sharing.FileList(
+			$el,
+			{
+				id: 'shares.pending',
+				scrollContainer: $('#app-content'),
+				pending: true,
+				fileActions: fileActions,
+				config: OCA.Files.App.getFilesConfig(),
+				detailsViewEnabled: false
+			}
+		);
+
+		this._extendFileList(this._pendingFileList);
+		this._pendingFileList.appName = t('files_sharing', 'Pending shares');
+		this._pendingFileList.$el.find('#emptycontent').html('<div class="icon-share"></div>' +
+			'<h2>' + t('files_sharing', 'No pending shares') + '</h2>' +
+			'<p>' + t('files_sharing', 'Pending incomming shares will be shown here') + '</p>');
+		return this._pendingFileList;
 	},
 
 	removeSharingIn: function() {
@@ -110,6 +149,12 @@ OCA.Sharing.App = {
 		}
 	},
 
+	removePendingShares: function() {
+		if (this._pendingFileList) {
+			this._pendingFileList.$fileList.empty();
+		}
+	},
+
 	/**
 	 * Destroy the app
 	 */
@@ -119,9 +164,11 @@ OCA.Sharing.App = {
 		this.removeSharingIn();
 		this.removeSharingOut();
 		this.removeSharingLinks();
+		this.removePendingShares();
 		this._inFileList = null;
 		this._outFileList = null;
 		this._linkFileList = null;
+		this._pendingFileList = null;
 		delete this._globalActionsInitialized;
 	},
 
@@ -192,6 +239,12 @@ $(document).ready(function() {
 	});
 	$('#app-content-sharinglinks').on('hide', function() {
 		OCA.Sharing.App.removeSharingLinks();
+	});
+	$('#app-content-pendingshares').on('show', function(e) {
+		OCA.Sharing.App.initPendingShares($(e.target));
+	});
+	$('#app-content-pendingshares').on('hide', function() {
+		OCA.Sharing.App.removePendingShares();
 	});
 });
 

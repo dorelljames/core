@@ -696,6 +696,7 @@ class Share20OCS {
 
 		$data['mimetype'] = $share->getNode()->getMimeType();
 		$data['name'] = $share->getNode()->getName();
+		$data['mtime'] = $share->getShareTime()->getTimestamp();
 
 
 		return $data;
