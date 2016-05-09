@@ -31,11 +31,6 @@ if [ -z "$thisFolder" ]; then
     thisFolder="."
 fi;
 
-# create readiness notification socket
-notify_sock=$(readlink -f "$thisFolder"/dockerContainerCeph.$EXECUTOR_NUMBER.swift.sock)
-rm -f "$notify_sock" # in case an unfinished test left one behind
-mkfifo "$notify_sock"
-
 port=5001
 
 user=test
@@ -53,7 +48,6 @@ container=`docker run -d \
     -e KEYSTONE_SERVICE=${service} \
     -e OSD_SIZE=300 \
     --privileged \
-    -v "$notify_sock":/run/notifyme.sock \
     ${docker_image}`
 
 host=`docker inspect --format="{{.NetworkSettings.IPAddress}}" $container`
@@ -65,13 +59,11 @@ echo "${docker_image} container: $container"
 echo $container >> $thisFolder/dockerContainerCeph.$EXECUTOR_NUMBER.swift
 
 echo "Waiting for ceph initialization"
-ready=$(timeout 600 cat "$notify_sock")
-if [[ $ready != 'READY=1' ]]; then
+if ! "$thisFolder"/env/wait-for-connection ${host} 80 600; then
     echo "[ERROR] Waited 600 seconds, no response" >&2
     docker logs $container
     exit 1
 fi
-echo "Waiting another 15 seconds"
 sleep 15
 
 cat > $thisFolder/config.swift.php <<DELIM
