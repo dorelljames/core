@@ -71,6 +71,9 @@ class FederatedShareProvider implements IShareProvider {
 	/** @var IConfig */
 	private $config;
 
+	/** @var string */
+	private $externalShareTable = 'share_external';
+
 	/**
 	 * DefaultShareProvider constructor.
 	 *
@@ -152,31 +155,25 @@ class FederatedShareProvider implements IShareProvider {
 			throw new \Exception($message_t);
 		}
 
-		$token = $this->tokenHandler->generateToken();
-
 		$shareWith = $user . '@' . $remote;
 
 		$storage = $share->getNode()->getStorage();
 
 		if ($storage->instanceOfStorage('OCA\Files_Sharing\External\Storage')) {
+			$token = $this->askOwnerToReShare($shareWith, $share);
+			$send = $token === '' ? false : true;
+			$shareId = $this->addShareToDB($itemSource, $itemType, $shareWith, $sharedBy, $uidOwner, $permissions, $token);
+		} else {
+			$token = $this->tokenHandler->generateToken();
+			$shareId = $this->addShareToDB($itemSource, $itemType, $shareWith, $sharedBy, $uidOwner, $permissions, $token);
 			$send = $this->notifications->sendRemoteShare(
 				$token,
 				$shareWith,
 				$share->getNode()->getName(),
+				$shareId,
 				$share->getSharedBy()
 			);
 		}
-
-
-		$shareId = $this->addShareToDB($itemSource, $itemType, $shareWith, $sharedBy, $uidOwner, $permissions, $token);
-
-		$send = $this->notifications->sendRemoteShare(
-			$token,
-			$shareWith,
-			$share->getNode()->getName(),
-			$shareId,
-			$share->getSharedBy()
-		);
 
 		$data = $this->getRawShare($shareId);
 		$share = $this->createShare($data);
@@ -189,6 +186,49 @@ class FederatedShareProvider implements IShareProvider {
 		}
 
 		return $share;
+	}
+
+	/**
+	 * @param string $shareWith
+	 * @param IShare $share
+	 * @return string
+	 * @throws \Exception
+	 */
+	protected function askOwnerToReShare($shareWith, IShare $share) {
+
+		$remoteShare = $this->getShareFromExternalShareTable($share);
+		$token = $remoteShare['share_token'];
+		$remoteId = $remoteShare['remote_id'];
+		$remote = $remoteShare['remote'];
+
+		$token = $this->notifications->requestReShare(
+			$token,
+			$remoteId,
+			$remote,
+			$shareWith,
+			$share->getPermissions()
+		);
+
+		return $token;
+	}
+
+	/**
+	 * @param IShare $share
+	 * @return array
+	 * @throws \Exception
+	 */
+	protected function getShareFromExternalShareTable(IShare $share) {
+		$query = $this->dbConnection->getQueryBuilder();
+		$query->select('*')->from($this->externalShareTable)
+			->where($query->expr()->eq('owner', $query->createNamedParameter($share->getShareOwner())))
+			->andWhere($query->expr()->eq('mountpoint', $query->createNamedParameter($share->getTarget())));
+		$result = $query->execute()->fetchAll();
+
+		if (isset($result[0])) {
+			return $result[0];
+		}
+
+		throw new \Exception('share not found in share_external table');
 	}
 
 	/**

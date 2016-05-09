@@ -207,6 +207,7 @@ class RequestHandler {
 				$share->setSharedWith($shareWith);
 				try {
 					$result = $this->federatedShareProvider->create($share);
+					return new \OC_OCS_Result(['token' => $result->getToken()]);
 				} catch (\Exception $e) {
 					return new \OC_OCS_Result(null, Http::STATUS_INTERNAL_SERVER_ERROR);
 				}
@@ -215,7 +216,7 @@ class RequestHandler {
 			}
 		}
 
-		return new \OC_OCS_Result();
+		return new \OC_OCS_Result(null, Http::STATUS_BAD_REQUEST);
 
 	}
 
