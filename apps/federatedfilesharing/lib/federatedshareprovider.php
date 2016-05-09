@@ -161,7 +161,8 @@ class FederatedShareProvider implements IShareProvider {
 
 		if ($storage->instanceOfStorage('OCA\Files_Sharing\External\Storage')) {
 			$token = $this->askOwnerToReShare($shareWith, $share);
-			$send = $token === '' ? false : true;
+			// remote share was create succesfully if we get a valid token as return
+			$send = is_string($token) && $token !== '' ;
 			$shareId = $this->addShareToDB($itemSource, $itemType, $shareWith, $sharedBy, $uidOwner, $permissions, $token);
 		} else {
 			$token = $this->tokenHandler->generateToken();
