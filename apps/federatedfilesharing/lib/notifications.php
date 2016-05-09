@@ -101,6 +101,45 @@ class Notifications {
 	}
 
 	/**
+	 * ask owner to re-share the file with the given user
+	 *
+	 * @param string $token
+	 * @param int $id
+	 * @param string $shareWith
+	 * @param int $permission
+	 * @param string $ownerUrl
+	 * @return bool
+	 * @throws \OC\HintException
+	 * @throws \OC\ServerNotAvailableException
+	 */
+	public function requestReShare($token, $id, $shareWith, $permission, $ownerUrl) {
+
+		list($user, $remote) = $this->addressHandler->splitUserRemote($shareWith);
+
+		if ($user && $remote) {
+
+			$fields = array(
+				'shareWith' => $user,
+				'token' => $token,
+				'id' => $id,
+				'permission' => $permission
+			);
+
+			$url = $this->addressHandler->removeProtocolFromUrl($ownerUrl);
+			$result = $this->tryHttpPostToShareEndpoint($url, '', $fields);
+			$status = json_decode($result['result'], true);
+
+			if ($result['success'] && ($status['ocs']['meta']['statuscode'] === 100 || $status['ocs']['meta']['statuscode'] === 200)) {
+				\OC_Hook::emit('OCP\Share', 'federated_share_added', ['server' => $remote]);
+				return true;
+			}
+
+		}
+
+		return false;
+	}
+
+	/**
 	 * send server-to-server unshare to remote server
 	 *
 	 * @param string $remote url

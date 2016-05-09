@@ -23,6 +23,7 @@
 
 namespace OCA\FederatedFileSharing;
 
+use OC\Files\View;
 use OC\Share20\Share;
 use OCP\Files\IRootFolder;
 use OCP\IAppConfig;
@@ -127,7 +128,7 @@ class FederatedShareProvider implements IShareProvider {
 		$uidOwner = $share->getShareOwner();
 		$permissions = $share->getPermissions();
 		$sharedBy = $share->getSharedBy();
-
+		
 		/*
 		 * Check if file is not already shared with the remote user
 		 */
@@ -154,6 +155,18 @@ class FederatedShareProvider implements IShareProvider {
 		$token = $this->tokenHandler->generateToken();
 
 		$shareWith = $user . '@' . $remote;
+
+		$storage = $share->getNode()->getStorage();
+
+		if ($storage->instanceOfStorage('OCA\Files_Sharing\External\Storage')) {
+			$send = $this->notifications->sendRemoteShare(
+				$token,
+				$shareWith,
+				$share->getNode()->getName(),
+				$share->getSharedBy()
+			);
+		}
+
 
 		$shareId = $this->addShareToDB($itemSource, $itemType, $shareWith, $sharedBy, $uidOwner, $permissions, $token);
 
