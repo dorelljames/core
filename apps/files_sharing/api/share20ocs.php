@@ -674,6 +674,10 @@ class Share20OCS {
 		return new \OC_OCS_Result($this->formatShare($share));
 	}
 
+	/**
+	 * @param Share\IShare $share
+	 * @return array
+	 */
 	private function formatPendingShare(\OCP\Share\IShare $share) {
 		$data = [
 			'id' => $share->getFullId(),
@@ -721,7 +725,11 @@ class Share20OCS {
 
 		return new \OC_OCS_Result($result);
 	}
-	
+
+	/**
+	 * @param string $id
+	 * @return \OC_OCS_Result
+	 */
 	public function getPendingShare($id) {
 		try {
 			$share = $this->shareManager->getShareById($id, $this->currentUser->getUID());
@@ -736,6 +744,10 @@ class Share20OCS {
 		return new \OC_OCS_Result($this->formatPendingShare($share));
 	}
 
+	/**
+	 * @param string $id
+	 * @return \OC_OCS_Result
+	 */
 	public function acceptPendingShare($id) {
 		try {
 			$share = $this->shareManager->getShareById($id, $this->currentUser->getUID());
